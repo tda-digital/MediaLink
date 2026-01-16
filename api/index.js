@@ -4,19 +4,26 @@ export default async function handler(req, res) {
 
   try {
     const response = await fetch(`https://www.youtube.com/channel/${id}/live`);
-    const text = await response.text();
+    const html = await response.text();
     
-    // Buscamos la URL del streaming
-    const match = text.match(/(https:[^"]*?\.m3u8)/);
+    // Nueva búsqueda mejorada para 2026
+    const regex = /"hlsManifestUrl":"(https:[^"]+?\.m3u8)"/;
+    const match = html.match(regex);
     
     if (match) {
-      const m3u8Url = match[0].replace(/\\/g, '');
-      // Redirigimos directamente al flujo de video
+      const m3u8Url = match[1].replace(/\\/g, '');
       res.redirect(302, m3u8Url);
     } else {
-      res.status(404).send("No se encontró una transmisión en vivo en este canal.");
+      // Intento secundario si el primero falla
+      const altRegex = /"hlsManifestUrl":"([^"]+)"/;
+      const altMatch = html.match(altRegex);
+      if (altMatch) {
+         res.redirect(302, altMatch[1].replace(/\\/g, ''));
+      } else {
+         res.status(404).send("YouTube no devolvió un enlace HLS. Asegúrate de que el canal esté realmente En Vivo.");
+      }
     }
   } catch (error) {
-    res.status(500).send("Error al obtener el video");
+    res.status(500).send("Error de conexión con YouTube");
   }
 }
