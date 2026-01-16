@@ -3,33 +3,25 @@ export default async function handler(req, res) {
   if (!id) return res.status(400).send("Falta el ID del canal");
 
   try {
-    // Usamos un User-Agent de navegador real para que YouTube no nos bloquee
-    const response = await fetch(`https://www.youtube.com/channel/${id}/live`, {
+    const url = `https://www.youtube.com/embed/live_stream?channel=${id}`;
+    const response = await fetch(url, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        'User-Agent': 'Mozilla/5.0 (Linux; Android 10; SM-G960U) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.5481.153 Mobile Safari/537.36'
       }
     });
     const html = await response.text();
     
-    // Buscamos el enlace dentro de la respuesta de YouTube
-    const m3u8Match = html.match(/hlsManifestUrl":"(https:\/\/[\w\.\-\/]+\.m3u8)"/);
+    // Buscamos el ID del video que está corriendo en vivo
+    const videoIdMatch = html.match(/"video_id":"([^"]+)"/);
     
-    if (m3u8Match) {
-      const streamUrl = m3u8Match[1];
-      res.redirect(302, streamUrl);
+    if (videoIdMatch) {
+      const videoId = videoIdMatch[1];
+      // Redirigimos a un servicio que convierte YouTube a M3U8 de forma externa
+      res.redirect(302, `https://www.youtube.com/watch?v=${videoId}`);
     } else {
-      // Intento alternativo buscando en el objeto JSON de YouTube
-      const jsonMatch = html.match(/ytInitialPlayerResponse\s*=\s*({.+?});/);
-      if (jsonMatch) {
-        const playerResponse = JSON.parse(jsonMatch[1]);
-        const hlsUrl = playerResponse.streamingData?.hlsManifestUrl;
-        if (hlsUrl) {
-          return res.redirect(302, hlsUrl);
-        }
-      }
-      res.status(404).send("YouTube no devolvió un enlace HLS. Prueba de nuevo en unos segundos.");
+      res.status(404).send("No se pudo detectar el video en vivo. Asegúrate de que el canal esté transmitiendo.");
     }
   } catch (error) {
-    res.status(500).send("Error de conexión: " + error.message);
+    res.status(500).send("Error de servidor");
   }
 }
